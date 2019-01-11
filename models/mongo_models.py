@@ -37,11 +37,12 @@ class Article(TimestampedDocument):
     }
 
     article_id = fields.IntField(required=True, unique=True)
+    author = fields.ReferenceField(Author, reverse_delete_rule=fields.DO_NOTHING)
     url = fields.URLField(required=True)
     title = fields.StringField(required=True)
+    post_content = fields.StringField(required=True)
     location = fields.StringField()
-    author = fields.ReferenceField(Author, reverse_delete_rule=fields.DO_NOTHING)
     post_count = fields.IntField(default=0)
     views_count = fields.IntField(default=0)
-    last_post_ts = fields.IntField(default=0)
+    last_post_dt = fields.DateTimeField(default=datetime.datetime.now)
     tags = fields.ListField(fields.StringField(max_length=30))

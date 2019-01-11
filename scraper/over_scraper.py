@@ -79,7 +79,7 @@ class Scraper(BaseScraper):
         loop.close()
 
         for item in topics_listing:
-            topic = topics_mapping.get(item.get('id'))
+            topic = topics_mapping.get(str(item.get('id')))
             item['post'] = topic.get('content') if topic else ''
 
         return topics_listing
@@ -93,18 +93,19 @@ class Scraper(BaseScraper):
         for url, req_params in urls:
             tasks.append(self._get_data(url, req_params, session, semaphore))
 
-        result = await asyncio.gather(*tasks, return_exceptions=True)
+        result = await asyncio.gather(*tasks, return_exceptions=self.raise_exceptions)
 
         await session.close()
         return result
 
     async def _get_data(self, url, req_params, session, semaphore):
         data = None
+        response=None
         try:
             response = await session.get(url, params=req_params, semaphore=semaphore, timeout=self.r_timeout)
         except Exception as err:
             raise ResponseError(f' -> Request on {self.FORUM_URL} failed. Error: {err}', url='None')
-        if response.text_content:
+        if response and response.text_content:
             data = {str(response.url): response.text_content}
         return data
 
@@ -162,13 +163,14 @@ class Scraper(BaseScraper):
         topics_data = []
         result = await self._get_content(urls)
         for topic in result:
-            for url, content in topic.items():
-                topics_data.append(
-                    {
-                        'id': url.split('=')[-1],
-                        'content': content
-                    }
-                )
+            if topic:
+                for url, content in topic.items():
+                    topics_data.append(
+                        {
+                            'id': url.split('=')[-1],
+                            'content': content
+                        }
+                    )
         return topics_data
 
     def process_topic(self, data):
