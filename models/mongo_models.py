@@ -1,6 +1,6 @@
 import datetime
 
-from mongoengine import fields, Document, connect
+from mongoengine import fields, Document, signals
 
 
 class TimestampedDocument(Document):
@@ -25,6 +25,7 @@ class Author(Document):
 
     nickname = fields.StringField(required=True, unique=True, max_length=255)
     profile_link = fields.URLField(required=True)
+    activity_index = fields.FloatField(default=0.0)
 
 
 class Article(TimestampedDocument):
@@ -46,3 +47,13 @@ class Article(TimestampedDocument):
     views_count = fields.IntField(default=0)
     last_post_dt = fields.DateTimeField(default=datetime.datetime.now)
     tags = fields.ListField(fields.StringField(max_length=30))
+
+    @classmethod
+    def post_save(cls, sender, document, **kwargs):
+        author_articles=sender.objects(author=document.author).count()
+        total_articles=sender.objects.count()
+        document.author.activity_index = total_articles/author_articles
+        document.author.save()
+
+
+signals.post_save.connect(Article.post_save, sender=Article)

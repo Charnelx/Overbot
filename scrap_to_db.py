@@ -19,14 +19,16 @@ def create_entries(article_item: dict):
             article_id=article_item.get('id'),
             last_post_dt=last_post_date
         ):
-            article_obj = Article(
+            _ = Article.objects(article_id=article_item.get('id')).modify(
+                upsert=True,
+                new=True,
                 article_id=article_item.get('id'),
                 author=author_obj,
                 url=article_item.get('url'),
                 title=article_item.get('title'),
                 post_content=article_item.get('post'),
                 location=article_item.get('location'),
-                post_count=article_item.get('post_count'),
+                post_count=article_item.get('posts_count'),
                 views_count=article_item.get('views_count'),
                 last_post_dt=last_post_date,
             ).save()
@@ -38,10 +40,7 @@ def create_entries(article_item: dict):
 if __name__ == '__main__':
     connect('Overbot')
 
-    s = Scraper(raise_exceptions=False)
+    s = Scraper(raise_exceptions=False, r_timeout=10, pause=10)
     result = s.get_content(1, 10)
     for item in result:
         create_entries(item)
-
-    # with open('dump.txt', 'w') as file:
-    #     file.write(json.dumps(result))

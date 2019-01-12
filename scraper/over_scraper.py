@@ -1,6 +1,8 @@
-import asyncio
 import datetime
 import logging
+from random import randint
+
+import asyncio
 from lxml import html
 
 from scraper_base import *
@@ -23,7 +25,7 @@ class Scraper(BaseScraper):
         'buy': '26',
     }
 
-    def __init__(self, coros_limit=100, r_timeout=5, pause=2, raise_exceptions=True):
+    def __init__(self, coros_limit=100, r_timeout=5, pause=15, raise_exceptions=True):
         self.r_timeout = r_timeout
         self.coros_limit = coros_limit
         self.raise_exceptions = raise_exceptions
@@ -51,11 +53,11 @@ class Scraper(BaseScraper):
 
     def get_content(self, start: int, end: int, *args, **kwargs):
 
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
+        self.loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(self.loop)
 
         urls = self._generate_listing_urls(start, end)
-        results_raw = loop.run_until_complete(self._get_content(urls))
+        results_raw = self.loop.run_until_complete(self._get_content(urls))
 
         topics_listing = []
         for page_index, page in enumerate(results_raw):
@@ -69,14 +71,14 @@ class Scraper(BaseScraper):
                         item['item_index'] = list_index
                         topics_listing.append(item)
 
-        topics_raw = loop.run_until_complete(self.get_topic_content(topics_listing))
+        topics_raw = self.loop.run_until_complete(self.get_topic_content(topics_listing))
 
         topics_mapping = {}
         for topic in topics_raw:
             topic['content'] = self.process_topic(topic.get('content'))
             topics_mapping[topic.get('id')] = topic
 
-        loop.close()
+        self.loop.close()
 
         for item in topics_listing:
             topic = topics_mapping.get(str(item.get('id')))
@@ -100,9 +102,16 @@ class Scraper(BaseScraper):
 
     async def _get_data(self, url, req_params, session, semaphore):
         data = None
-        response=None
+        response = None
+
         try:
-            response = await session.get(url, params=req_params, semaphore=semaphore, timeout=self.r_timeout)
+            response = await session.get(
+                url,
+                params=req_params,
+                semaphore=semaphore,
+                timeout=self.r_timeout,
+                sleep_on_retry=randint(0, self.pause)
+            )
         except Exception as err:
             raise ResponseError(f' -> Request on {self.FORUM_URL} failed. Error: {err}', url='None')
         if response and response.text_content:
@@ -138,7 +147,6 @@ class Scraper(BaseScraper):
                 result['author'] = node_author.text
 
                 result['posts_count'] = int(topic.xpath('./dl/dd[@class="posts"]/text()')[0])
-
                 result['views_count'] = int(topic.xpath('./dl/dd[@class="views"]/text()')[0])
 
                 node_last_post_info = topic.xpath('./dl/dd[@class="lastpost"]/span/br/following::text()')[0]
@@ -148,8 +156,6 @@ class Scraper(BaseScraper):
         return results
 
     async def get_topic_content(self, topics_listing: list):
-        await asyncio.sleep(self.pause)
-
         urls = []
         for topic in topics_listing[:]:
             req_params = {'f': self.FORUMS.get('buy'), 't': topic.get('id')}

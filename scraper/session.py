@@ -14,7 +14,7 @@ class GSession(aiohttp.ClientSession):
         super().__init__(*args, **kwargs)
         self.logger = logging.getLogger('great_session')
 
-    async def get(self, url, *, allow_redirects=True, semaphore=None, **kwargs):
+    async def get(self, url, *, allow_redirects=True, semaphore=None, sleep_on_retry=None, **kwargs):
         retries = 0
         while True:
             if semaphore:
@@ -29,12 +29,13 @@ class GSession(aiohttp.ClientSession):
                 self.logger.error('Timeout at {} (params: {}). Retry #{}'.format(url, kwargs, retries))
 
                 retries += 1
-                if retries > 3:
+                if retries == 3:
                     break
                 else:
                     if semaphore:
                         semaphore.release()
-                    asyncio.sleep(2)
+                    if sleep_on_retry:
+                        await asyncio.sleep(sleep_on_retry)
             finally:
                 if semaphore:
                     semaphore.release()
