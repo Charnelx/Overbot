@@ -1,6 +1,6 @@
 import datetime
 
-from mongoengine import fields, Document, signals
+from mongoengine import fields, Document, EmbeddedDocument, signals
 
 
 class TimestampedDocument(Document):
@@ -19,6 +19,11 @@ class TimestampedDocument(Document):
             self.creation_date = datetime.datetime.now()
         self.modified_date = datetime.datetime.now()
         return super().save(*args, **kwargs)
+
+
+class Sentence(EmbeddedDocument):
+    text = fields.StringField(required=True)
+    price = fields.FloatField(min_value=0.0, max_value=100000)
 
 
 class Author(Document):
@@ -47,6 +52,7 @@ class Article(TimestampedDocument):
     views_count = fields.IntField(default=0)
     last_post_dt = fields.DateTimeField(default=datetime.datetime.now)
     tags = fields.ListField(fields.StringField(max_length=30))
+    sentences = fields.ListField(fields.EmbeddedDocumentField(Sentence))
 
     @classmethod
     def post_save(cls, sender, document, **kwargs):
